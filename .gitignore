@@ -1,0 +1,26 @@
+# Python virtual environments
+emotions/
+coherence/
+twist/
+venv/
+env/
+*.env
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE configuration files
+.vscode/
+.idea/
+
+# Operating System files
+.DS_Store
+Thumbs.db
