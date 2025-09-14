@@ -3,11 +3,8 @@ import sys
 import json
 import csv
 from typing import List, Tuple, Dict
-from transformers.utils import logging as hf_logging
 
-hf_logging.set_verbosity_error()
-
-# Optional TRUNAJOD coherence
+# TRUNAJOD
 _TRUNAJOD_AVAILABLE = True
 try:
     from TRUNAJOD.entity_grid import EntityGrid, get_local_coherence
@@ -205,7 +202,6 @@ def _majority_protagonist(docs):
     return max(counts.items(), key=lambda x: x[1])[0]
 
 def _split_sents(text: str, nlp=None):
-    """優先用 spaCy 斷句；失敗改用簡單正則。"""
     if nlp:
         try:
             return [s.text.strip() for s in nlp(text).sents if s.text.strip()]
@@ -216,7 +212,7 @@ def _split_sents(text: str, nlp=None):
     return [s.strip() for s in sents if s.strip()]
 
 def _extract_protagonist_claims(chap_texts, protagonist: str, nlp=None, max_per_chapter: int = 5):
-    """Strict extraction: keep only static-attribute sentences about the protagonist."""
+
     import re
 
     def normalize_name(s: str, name: str) -> str:
@@ -224,21 +220,16 @@ def _extract_protagonist_claims(chap_texts, protagonist: str, nlp=None, max_per_
             return s
         text = s
         nl = name.lower()
-        if nl.startswith("thom"):
-            text = re.sub(r"\bTomas\b", "Thomas", text, flags=re.IGNORECASE)
-        return text
 
     prot_lower = protagonist.lower() if protagonist else ""
     per_chapter = []
 
-    # 要排除：對話/報導動詞/效果詞/時間詞/動作動詞（避免劇情推進被當矛盾）
     dialogue_markers = [" said ", " says ", " told ", " asked ", " replied ", " whispered ", " shouted ", " exclaimed "]
     effect_markers   = [" seemed ", " appears ", " felt ", " glowing ", " light ", " breeze ", " wind ", " magic ", " portal "]
     time_markers     = [" then ", " later ", " after ", " afterwards ", " eventually ", " finally ", " soon "]
     action_verbs     = [" dropped ", " played ", " playing ", " began ", " opened ", " watched ", " entered ", " approached ",
                         " turned ", " walked ", " ran ", " shouted ", " fought ", " slammed ", " closed ", " pulled ", " pushed "]
 
-    # 僅允許：家庭/職業/居住/出身/年齡等靜態線索
     family_terms     = [" brother", " sister", " father", " mother", " parents", " daughter", " son"]
     profession_terms = [" student", " teacher", " guard", " musician", " carpenter", " farmer", " baker", " knight", " lord", " maid"]
     location_patterns= [" lives in", " lives at", " is from", " comes from", " born in", " born at", " from "]
@@ -281,71 +272,120 @@ def _extract_protagonist_claims(chap_texts, protagonist: str, nlp=None, max_per_
 
 # ---------------- Consistency (NLI) core ----------------
 def nli_contradiction_metrics(chap_texts, docs) -> dict:
+    if not chap_texts or not _NLP or not docs:
+        return {}
+
+    # 主角
     protagonist = _majority_protagonist(docs)
     if not protagonist:
         return {}
 
-    claims_per_ch = _extract_protagonist_claims(chap_texts, protagonist, _NLP, max_per_chapter=5)
+    claims_per_ch = _extract_protagonist_claims(
+        chap_texts, protagonist, _NLP, max_per_chapter=5
+    )
 
-    max_gap = 2
-    pairs, idx_pairs = [], []
-    for i in range(len(claims_per_ch)):
-        for j in range(i+1, min(len(claims_per_ch), i+1+max_gap)):
-            for p in claims_per_ch[i]:
-                for h in claims_per_ch[j]:
-                    pairs.append((p, h))
-                    idx_pairs.append((i, j))
-    if not pairs:
-        return {}
+    #  建立跨章配對
+    idx_pairs = [(i, j) for i in range(len(claims_per_ch))
+                 for j in range(i+1, len(claims_per_ch))
+                 if claims_per_ch[i] and claims_per_ch[j]]
+    num_pairs = sum(len(claims_per_ch[i]) * len(claims_per_ch[j]) for i, j in idx_pairs)
 
-    try:
-        from transformers import pipeline
-        from transformers.utils import logging as hf_logging
-        hf_logging.set_verbosity_error()
-
-        for model_name in ["roberta-large-mnli", "distilroberta-base-mnli"]:
-            try:
-                nli = pipeline("text-classification", model=model_name, tokenizer=model_name, top_k=None)
-                break
-            except Exception:
-                nli = None
-        if nli is None:
-            return {}
-
-        contradictions, total = 0, 0
-        examples = []  # (score, i, j, prem, hyp)
-        BATCH, TH = 16, 0.70
-
-        for k in range(0, len(pairs), BATCH):
-            chunk = pairs[k:k+BATCH]
-            inputs = [{"text": prem, "text_pair": hyp} for prem, hyp in chunk]
-            outputs = nli(inputs, truncation=True, max_length=256)
-            for off, scores in enumerate(outputs):
-                lab2p = {d["label"].upper(): d["score"] for d in scores}
-                p_contra = lab2p.get("CONTRADICTION")
-                if p_contra is None and "LABEL_0" in lab2p and "LABEL_2" in lab2p:
-                    p_contra = lab2p["LABEL_0"]  # 多數 MNLI 標籤順序
-                total += 1
-                i, j = idx_pairs[k + off]
-                prem, hyp = pairs[k + off]
-                if p_contra is not None:
-                    examples.append((p_contra, i, j, prem, hyp))
-                    if p_contra >= TH:
-                        contradictions += 1
-
-        if total == 0:
-            return {}
-
-        examples.sort(key=lambda x: x[0], reverse=True)
+    if num_pairs == 0:
         return {
             "nli_protagonist": protagonist,
-            "nli_pairs": total,
-            "nli_contradictions": contradictions,
-            "nli_contradiction_rate": contradictions / total,
-            "nli_top_contradictions": examples[:5],
+            "nli_pairs": 0,
+            "nli_contradictions": 0,
+            "nli_contradiction_rate": 0.0,
         }
-    except Exception:
-        return {}
+
+    pairs = []
+    for i, j in idx_pairs:
+        for prem in claims_per_ch[i]:
+            for hyp in claims_per_ch[j]:
+                pairs.append((prem, hyp, i, j))
+
+    # 載入 NLI
+    from transformers import pipeline
+    from transformers.utils import logging as hf_logging
+    hf_logging.set_verbosity_error()
+
+    CANDIDATE_MNLI_MODELS = [
+        "facebook/bart-large-mnli",
+        "microsoft/deberta-v3-base-mnli",
+        "roberta-large-mnli",
+        "typeform/distilroberta-base-mnli",
+    ]
+
+    nli = None
+    last_err = None
+    for model_name in CANDIDATE_MNLI_MODELS:
+        try:
+            nli = pipeline(
+                task="text-classification",
+                model=model_name,
+                tokenizer=model_name,
+                top_k=None,    
+                token=False,  
+                device=-1,    
+            )
+            print(f"[NLI] using model: {model_name}")
+            break
+        except Exception as e:
+            last_err = e
+            nli = None
+
+    if nli is None:
+        print(f"[NLI] init failed: {last_err!r}")
+        return {
+            "nli_protagonist": protagonist,
+            "nli_pairs": 0,
+            "nli_contradictions": 0,
+            "nli_contradiction_rate": 0.0,
+        }
+
+    texts = [p for (p, h, _, _) in pairs]
+    text_pairs = [h for (p, h, _, _) in pairs]
+    outputs = nli(texts, text_pair=text_pairs, batch_size=16, truncation=True)
+    print(f"[NLI] outputs={len(outputs)}")
+
+    # 正規化 
+    id2label = getattr(getattr(nli, "model", None), "config", None)
+    id2label = getattr(id2label, "id2label", {}) or {}
+    def norm(lbl: str) -> str:
+        u = str(lbl).upper()
+        if u in ("ENTAILMENT", "NEUTRAL", "CONTRADICTION"):
+            return u
+        if u.startswith("LABEL_"):
+            try:
+                idx = int(u.split("_")[1])
+                return str(id2label.get(idx, u)).upper()
+            except Exception:
+                return u
+        return u
+
+    def to_map(one):
+        if isinstance(one, list):
+            return {norm(d["label"]): float(d["score"]) for d in one}
+        return {norm(one["label"]): float(one["score"])}
+
+    outs = [to_map(o) for o in outputs]
+
+    # 矛盾比
+    TH = 0.70
+    contradictions = 0
+    for m in outs:
+        if m.get("CONTRADICTION", 0.0) >= TH:
+            contradictions += 1
+
+    total = len(outs)
+    rate = (contradictions / total) if total else 0.0
+
+    return {
+        "nli_protagonist": protagonist,
+        "nli_pairs": total,
+        "nli_contradictions": contradictions,
+        "nli_contradiction_rate": rate,
+    }
 
 # ---------------- Reporting ----------------
 def evaluate_file(path: str) -> Dict:
@@ -366,6 +406,12 @@ def evaluate_file(path: str) -> Dict:
     # 章與章之間
     chap_texts = read_chapters(path)
     docs = [_NLP(t) for t in chap_texts] if _NLP else []
+
+    try:
+        prot_guess = _majority_protagonist(docs) if docs else None
+    except Exception:
+        prot_guess = None
+
     cont = continuity_metrics(docs) if docs else {
         "jac_median": 0.0,
         "jac_low_ratio": 0.0,
@@ -380,14 +426,14 @@ def evaluate_file(path: str) -> Dict:
         "rep10": rep10,
         "ppl3_add1": ppl3,
         "coherence": coh,
+        "protagonist_guess": prot_guess,
     }
     res.update(cont) 
     try:
         nli_stats = nli_contradiction_metrics(chap_texts, docs) if docs else {}
-        if nli_stats:
-            res.update(nli_stats)
-    except Exception:
-        pass
+        res.update(nli_stats or {})
+    except Exception as e:
+        print("[EVAL] NLI crashed:", repr(e))
 
     return res
 
@@ -410,18 +456,25 @@ def print_report(res: Dict, simple: bool = False):
 
     if 'nli_contradiction_rate' in res:
         print("\n=== NLI Consistency ===")
-        print(f"Protagonist                     : {res.get('nli_protagonist','?')}")
-        print(f"Pairs evaluated                 : {res.get('nli_pairs',0)}")
-        print(f"Contradictions                  : {res.get('nli_contradictions',0)}")
-        print(f"Contradiction rate              : {res.get('nli_contradiction_rate',0.0):.3f}")
-        
-        tops = res.get("nli_top_contradictions") or []
-            if tops:
-                print("\nTop contradictions (score, ch_i→ch_j):")
-                for sc, i, j, prem, hyp in tops:
-                    print(f"  {sc:.2f}  ({i}->{j})")
-                    print(f"     Prem: {prem[:120]}")
-                    print(f"     Hyp : {hyp[:120]}")
+        proto = res.get('nli_protagonist') or res.get('protagonist_guess') or '?'
+        print(f"Protagonist                     : {proto}")
+        print(f"Pairs evaluated                 : {res.get('nli_pairs', 0)}")
+        print(f"Contradictions                  : {res.get('nli_contradictions', 0)}")
+        print(f"Contradiction rate              : {res.get('nli_contradiction_rate', 0.0):.3f}")
+
+        # tops = (res.get('nli_top_contradictions') or [])[:5]
+        # if tops:
+        #     print("Top contradictions (score  ch_i→ch_j  premise || hypothesis)")
+        #     for t in tops:
+        #         if isinstance(t, dict):
+        #             score = t.get('score', 0.0)
+        #             i = t.get('i'); j = t.get('j')
+        #             prem = t.get('premise',''); hyp = t.get('hypothesis','')
+        #         else:
+        #             score, i, j, prem, hyp = (t + (None,))[:5]  # 防禦性解包
+        #         sp = (prem[:80] + '…') if len(prem) > 80 else prem
+        #         sh = (hyp[:80] + '…') if len(hyp) > 80 else hyp
+        #         print(f"  {score:.3f}   ch_{i}→ch_{j}   {sp} || {sh}")
 
 def write_csv(rows: List[Dict], out_path: str):
     fieldnames = ["file", "tokens", "rep6", "rep10", "ppl3_add1"]
