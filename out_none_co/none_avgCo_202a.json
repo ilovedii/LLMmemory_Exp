@@ -1,0 +1,88 @@
+{
+  "length": {
+    "tokens": {
+      "value": 1020.4
+    }
+  },
+  "n_gram": {
+    "rep6": {
+      "value": 0.0122
+    },
+    "rep10": {
+      "value": 0.0053
+    }
+  },
+  "Perplexity": {
+    "ppl3_add1": {
+      "value": 343.1569,
+      "explain": "困惑度(越低越好讀)",
+      "range": "0~inf"
+    }
+  },
+  "consistency(TRUNAJOD)": {
+    "PU": {
+      "value": 10.9018,
+      "explain": "主語連貫性"
+    },
+    "PW": {
+      "value": 13.6503,
+      "explain": "賓語連貫性"
+    },
+    "PACC": {
+      "value": 72.4566,
+      "explain": "整體連貫性"
+    },
+    "PU_dist": {
+      "value": 1.5503,
+      "explain": "PU 距離量度"
+    },
+    "PW_dist": {
+      "value": 2.0673,
+      "explain": "PW 距離量度"
+    },
+    "PACC_dist": {
+      "value": 10.7167,
+      "explain": "PACC 距離量度"
+    }
+  },
+  "NER(Jaccard)": {
+    "jac_median": {
+      "value": 0.25,
+      "explain": "相鄰章實體重疊中位數",
+      "range": "0~1"
+    },
+    "jac_low_ratio": {
+      "value": 0.5833,
+      "explain": "相鄰章幾乎不重疊的比例(越低越好)",
+      "range": "0~1"
+    },
+    "main_persist": {
+      "value": 0.3333,
+      "explain": "主角持續度",
+      "range": "0~1"
+    }
+  },
+  "Threadness": {
+    "threadness": {
+      "value": 0.0061,
+      "explain": "相鄰章和非相鄰章的相似度",
+      "range": "-1~1"
+    }
+  },
+  "NLI": {
+    "nli_pairs": {
+      "value": 33.7,
+      "explain": "跨章比對的句子對數量"
+    },
+    "nli_contradictions": {
+      "value": 7.9,
+      "explain": "矛盾的對數",
+      "range": "0~nli_pairs"
+    },
+    "nli_contradiction_rate": {
+      "value": 0.224,
+      "explain": "矛盾比",
+      "range": "0~1"
+    }
+  }
+}

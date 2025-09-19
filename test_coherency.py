@@ -3,6 +3,18 @@ import sys
 import json
 import csv
 from typing import List, Tuple, Dict
+import re
+
+import torch
+device_id = 0 if torch.cuda.is_available() else -1   
+
+def _clean_str(x):
+    if hasattr(x, "text"):
+        x = x.text
+    x = "" if x is None else str(x)
+    x = re.sub(r'[“”"「」()\[\]]', '', x)
+    x = re.sub(r'\s+', ' ', x).strip()
+    return x
 
 # TRUNAJOD
 _TRUNAJOD_AVAILABLE = True
@@ -211,62 +223,25 @@ def _split_sents(text: str, nlp=None):
     sents = re.split(r'(?<=[.!?。！？])\s+', text or "")
     return [s.strip() for s in sents if s.strip()]
 
-def _extract_protagonist_claims(chap_texts, protagonist: str, nlp=None, max_per_chapter: int = 5):
+def _extract_protagonist_claims(chap_texts, protagonist: str, nlp=None, max_per_chapter: int = 8):
+    prot = (protagonist or "").lower()
 
-    import re
+    PRONS = {" he ", " she ", " they ", " i ", " his ", " her ", " their ", " my ", " me ", " him ", " them "}
+    NEG = {" not ", " never ", " no ", " doesn't ", " isn't ", " aren't ", " didn't "}
+    COP = {" is ", " was ", " are ", " were ", " has ", " had ", " does ", " did ", ":"}
 
-    def normalize_name(s: str, name: str) -> str:
-        if not name:
-            return s
-        text = s
-        nl = name.lower()
-
-    prot_lower = protagonist.lower() if protagonist else ""
     per_chapter = []
-
-    dialogue_markers = [" said ", " says ", " told ", " asked ", " replied ", " whispered ", " shouted ", " exclaimed "]
-    effect_markers   = [" seemed ", " appears ", " felt ", " glowing ", " light ", " breeze ", " wind ", " magic ", " portal "]
-    time_markers     = [" then ", " later ", " after ", " afterwards ", " eventually ", " finally ", " soon "]
-    action_verbs     = [" dropped ", " played ", " playing ", " began ", " opened ", " watched ", " entered ", " approached ",
-                        " turned ", " walked ", " ran ", " shouted ", " fought ", " slammed ", " closed ", " pulled ", " pushed "]
-
-    family_terms     = [" brother", " sister", " father", " mother", " parents", " daughter", " son"]
-    profession_terms = [" student", " teacher", " guard", " musician", " carpenter", " farmer", " baker", " knight", " lord", " maid"]
-    location_patterns= [" lives in", " lives at", " is from", " comes from", " born in", " born at", " from "]
-    age_patterns     = [" years old", " year-old"]
-
     for t in chap_texts:
         sents = _split_sents(t, nlp)
         picks = []
         for s in sents:
-            s_norm = normalize_name(s, protagonist)
-            sl = s_norm.lower()
-            if '"' in s or '“' in s or '”' in s:
-                continue
-            if any(m in sl for m in (dialogue_markers + effect_markers + time_markers + action_verbs)):
-                continue
-            if not prot_lower or prot_lower not in sl:
-                continue
-
-            keep = False
-            if (" is " in sl or " was " in sl):
-                if not re.search(r"\bis\s+(playing|running|walking|fighting|opening|closing|watching)\b", sl):
-                    keep = True
-
-            if (" has " in sl or " have " in sl):
-                keep = True
-
-            if any(term in sl for term in (family_terms + profession_terms)):
-                keep = True
-            if any(p in sl for p in (location_patterns + age_patterns)):
-                keep = True
-
-            if keep:
-                picks.append(s_norm)
-
-            if len(picks) >= max_per_chapter:
-                break
-
+            sl = _clean_str(s).lower()
+            cond1 = (prot and (" " + prot + " ") in (" " + sl + " ")) or any(p in (" " + sl + " ") for p in PRONS)
+            cond2 = any(k in (" " + sl + " ") for k in COP) or any(k in (" " + sl + " ") for k in NEG)
+            if cond1 and cond2:
+                picks.append(s)
+                if len(picks) >= max_per_chapter:
+                    break
         per_chapter.append(picks)
     return per_chapter
 
@@ -275,22 +250,30 @@ def nli_contradiction_metrics(chap_texts, docs) -> dict:
     if not chap_texts or not _NLP or not docs:
         return {}
 
-    # 主角
+    # 抓主角
     protagonist = _majority_protagonist(docs)
     if not protagonist:
         return {}
 
     claims_per_ch = _extract_protagonist_claims(
-        chap_texts, protagonist, _NLP, max_per_chapter=5
+        chap_texts, protagonist, _NLP, max_per_chapter=10
     )
 
-    #  建立跨章配對
-    idx_pairs = [(i, j) for i in range(len(claims_per_ch))
-                 for j in range(i+1, len(claims_per_ch))
-                 if claims_per_ch[i] and claims_per_ch[j]]
-    num_pairs = sum(len(claims_per_ch[i]) * len(claims_per_ch[j]) for i, j in idx_pairs)
+    # 配對
+    import re, random
+    WINDOW = 2
+    MAX_PAIRS = 200
 
-    if num_pairs == 0:
+    n = len(claims_per_ch)
+    idx_pairs = []
+    for i in range(n):
+        if not claims_per_ch[i]:
+            continue
+        for j in range(i + 1, min(i + 1 + WINDOW, n)):
+            if claims_per_ch[j]:
+                idx_pairs.append((i, j))
+
+    if not idx_pairs:
         return {
             "nli_protagonist": protagonist,
             "nli_pairs": 0,
@@ -302,9 +285,26 @@ def nli_contradiction_metrics(chap_texts, docs) -> dict:
     for i, j in idx_pairs:
         for prem in claims_per_ch[i]:
             for hyp in claims_per_ch[j]:
-                pairs.append((prem, hyp, i, j))
+                p = _clean_str(prem)
+                h = _clean_str(hyp)
+                if p and h:
+                    pairs.append((p, h, i, j))
 
-    # 載入 NLI
+    pairs = list({(p, h, i, j) for (p, h, i, j) in pairs})
+    if len(pairs) > MAX_PAIRS:
+        pairs = random.sample(pairs, MAX_PAIRS)
+
+    if not pairs:
+        return {
+            "nli_protagonist": protagonist,
+            "nli_pairs": 0,
+            "nli_contradictions": 0,
+            "nli_contradiction_rate": 0.0,
+        }
+
+    items = [{"text": p, "text_pair": h} for (p, h, _, _) in pairs]
+
+    # NLI pipeline
     from transformers import pipeline
     from transformers.utils import logging as hf_logging
     hf_logging.set_verbosity_error()
@@ -324,11 +324,11 @@ def nli_contradiction_metrics(chap_texts, docs) -> dict:
                 task="text-classification",
                 model=model_name,
                 tokenizer=model_name,
-                top_k=None,    
-                token=False,  
-                device=-1,    
+                top_k=None,          
+                device=device_id,    
             )
-            print(f"[NLI] using model: {model_name}")
+            
+            #print(f"[NLI] using model: {model_name}")
             break
         except Exception as e:
             last_err = e
@@ -343,14 +343,11 @@ def nli_contradiction_metrics(chap_texts, docs) -> dict:
             "nli_contradiction_rate": 0.0,
         }
 
-    texts = [p for (p, h, _, _) in pairs]
-    text_pairs = [h for (p, h, _, _) in pairs]
-    outputs = nli(texts, text_pair=text_pairs, batch_size=16, truncation=True)
-    print(f"[NLI] outputs={len(outputs)}")
+    outputs = nli(items, batch_size=16, truncation=True)
 
-    # 正規化 
     id2label = getattr(getattr(nli, "model", None), "config", None)
     id2label = getattr(id2label, "id2label", {}) or {}
+
     def norm(lbl: str) -> str:
         u = str(lbl).upper()
         if u in ("ENTAILMENT", "NEUTRAL", "CONTRADICTION"):
@@ -370,13 +367,8 @@ def nli_contradiction_metrics(chap_texts, docs) -> dict:
 
     outs = [to_map(o) for o in outputs]
 
-    # 矛盾比
     TH = 0.70
-    contradictions = 0
-    for m in outs:
-        if m.get("CONTRADICTION", 0.0) >= TH:
-            contradictions += 1
-
+    contradictions = sum(1 for m in outs if m.get("CONTRADICTION", 0.0) >= TH)
     total = len(outs)
     rate = (contradictions / total) if total else 0.0
 
