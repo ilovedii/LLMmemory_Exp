@@ -29,3 +29,11 @@ To set up and install the necessary packages for the `twist` environment, run th
 ```bash
 pip install -r twist_requirements.txt
 ```
+
+### Environment: `diversity`
+
+To set up and install the necessary packages for the `diversity` environment, run the following command:
+
+```bash
+pip install -r diversity_requirements.txt
+```
