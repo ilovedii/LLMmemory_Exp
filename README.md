@@ -29,7 +29,3 @@ To set up and install the necessary packages for the `twist` environment, run th
 ```bash
 pip install -r twist_requirements.txt
 ```
-
-## Notes
-
-- `none_temp0` 是之前做錯的資料，目前可以先忽略
