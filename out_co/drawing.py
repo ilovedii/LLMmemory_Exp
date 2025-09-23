@@ -89,20 +89,21 @@ for group in group_names:
         coherence_with.append(np.nan)
 
 x = np.arange(len(group_names))
-bar_width = 0.25
+bar_width = 0.08
 
 plt.figure(figsize=(12, 6))
-plt.bar(x - (bar_width/2+ 0.05), nli_without, bar_width, label='without mem0', color='#6aaac4')
-plt.bar(x + (bar_width/2+ 0.05), nli_with, bar_width, label='with mem0', color='#87ceeb', hatch='///', edgecolor='white')
+# plt.bar(x - (bar_width/2+ 0.05), nli_without, bar_width, label='without mem0', color='#6aaac4')
+# plt.bar(x + (bar_width/2+ 0.05), nli_with, bar_width, label='with mem0', color='#87ceeb', hatch='///', edgecolor='white')
 
-# offsets = np.linspace(-bar_width*4, bar_width*4, 6)
-# plt.bar(x + offsets[0], jac_median_without, bar_width, label='jac_median (without mem0)', color='#6aaac4')
-# plt.bar(x + offsets[1], jac_median_with, bar_width, label='jac_median (with mem0)', color='#87ceeb', hatch='////', edgecolor='white')
-# plt.bar(x + offsets[4], main_persist_without, bar_width, label='main_persist (without mem0)', color="#FF8952")
-# plt.bar(x + offsets[5], main_persist_with, bar_width, label='main_persist (with mem0)', color="#F58D5C", hatch='////', edgecolor='white')
-# plt.bar(x + offsets[2], jac_low_ratio_without, bar_width, label='jac_low_ratio (without mem0)', color="#919090")
-# plt.bar(x + offsets[3], jac_low_ratio_with, bar_width, label='jac_low_ratio (with mem0)', color="#C2C2C2", hatch='////', edgecolor='white')
-
+offsets = np.linspace(-bar_width*4, bar_width*4, 6)
+plt.bar(x + offsets[0], jac_median_without, bar_width, label='jac_median (without mem0)', color='#6aaac4')
+plt.bar(x + offsets[1], jac_median_with, bar_width, label='jac_median (with mem0)', color='#87ceeb', hatch='////', edgecolor='white')
+plt.bar(x + offsets[4], main_persist_without, bar_width, label='main_persist (without mem0)', color="#FF8952")
+plt.bar(x + offsets[5], main_persist_with, bar_width, label='main_persist (with mem0)', color="#F58D5C", hatch='////', edgecolor='white')
+plt.bar(x + offsets[2], jac_low_ratio_without, bar_width, label='jac_low_ratio (without mem0)', color="#919090")
+plt.bar(x + offsets[3], jac_low_ratio_with, bar_width, label='jac_low_ratio (with mem0)', color="#C2C2C2", hatch='////', edgecolor='white')
+plt.ylim(0, 1.4)
+plt.yticks(np.arange(0, 1.5, 0.2))
 
 
 # plt.bar(x - (bar_width/2+ 0.05), perplexity_without, bar_width, label='without mem0', color='#6aaac4')
@@ -118,10 +119,10 @@ plt.bar(x + (bar_width/2+ 0.05), nli_with, bar_width, label='with mem0', color='
 
 plt.xticks(x, group_names, rotation=45, ha='right')
 plt.ylabel('Value')
-plt.title('NLI Contradiction Rate (↓) Average')
-# plt.title('NER Jaccard Comparison')
+# plt.title('NLI Contradiction Rate (↓) Average')
+plt.title('NER-based Coherence Comparison (jac_median(↑), main_persist(↑), jac_low_ratio(↓)) Average')
 # plt.title('Perplexity Comparison (↓) Average')
 # plt.title('Thematic Coherence Comparison (↑) Average')
 plt.legend()
 plt.tight_layout()
-plt.savefig('out_pic/nli.png')
+plt.savefig('out_pic/ner.png')
