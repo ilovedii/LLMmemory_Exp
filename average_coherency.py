@@ -17,8 +17,9 @@ INFO = {
     "jac_low_ratio": ("相鄰章幾乎不重疊的比例(越低越好)", "0~1"),
     "main_persist": ("主角持續度", "0~1"),
 
-    "threadness": ("相鄰章和非相鄰章的相似度", "-1~1"),
-
+    "global_coherence": ("全域相似度", "-1~1"),
+    "local_coherence": ("相鄰章和非相鄰章的相似度", "-1~1"),
+    
     "nli_pairs": ("跨章比對的句子對數量", None),
     "nli_contradictions": ("矛盾的對數", "0~nli_pairs"),
     "nli_contradiction_rate": ("矛盾比", "0~1"),
@@ -33,8 +34,8 @@ def wrap(key, val):
     return entry
 
 def main():
-    base_dir = "none_temp0.4"
-    files = [os.path.join(base_dir, f"404b-{i}.json") for i in range(1, 11)]
+    base_dir = "data/mem0_404b"
+    files = [os.path.join(base_dir, f) for f in os.listdir(base_dir) if f.endswith('.json')]
     results = []
     for f in files:
         if os.path.exists(f):
@@ -70,7 +71,7 @@ def main():
         "Perplexity": {},
         "consistency(TRUNAJOD)": {},
         "NER(Jaccard)": {},
-        "Threadness": {},
+        "Thematic coherence": {},
         "NLI": {}
     }
 
@@ -91,8 +92,8 @@ def main():
         elif key in ("jac_median", "jac_low_ratio", "main_persist"):
             avg["NER(Jaccard)"][key] = wrap(key, v)
 
-        elif key in ("threadness",):
-            avg["Threadness"][key] = wrap(key, v)
+        elif key in ("global_coherence", "local_coherence"):
+            avg["Thematic coherence"][key] = wrap(key, v)
 
         elif key.startswith("nli_"):
             avg["NLI"][key] = wrap(key, v)
@@ -103,11 +104,11 @@ def main():
                 v = ctotal / coherence_counts[ckey]
                 avg["consistency(TRUNAJOD)"][ckey] = wrap(ckey, v)
 
-    os.makedirs("none_coherency", exist_ok=True)
-    with open("none_coherency/none_avgCo_404b.json", "w", encoding="utf-8") as f:
+    os.makedirs("out_co", exist_ok=True)
+    with open("out_co/mem0_avgCo_404b.json", "w", encoding="utf-8") as f:
         json.dump(avg, f, ensure_ascii=False, indent=2)
 
-    print("Averaged results saved to none_coherency/none_avgCo_404b.json")
+    print("Averaged results saved to out_co/mem0_avgCo_404b.json")
 
 if __name__ == "__main__":
     main()

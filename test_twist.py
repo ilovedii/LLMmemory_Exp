@@ -20,7 +20,7 @@ def _ensure_last_n(bkps, n):
     return bkps
 
 def segment_plot_1d(values, chapter_ids=None, *, 
-                    mode="k", k=1, pen=10.0, cuts=None,
+                    mode="k", k=1, pen=1, cuts=None,
                     min_size=2, model="rbf",
                     fig_path="seg1d.png", title=None):
 
@@ -167,8 +167,8 @@ def load_values_from_json(json_path: str) -> Tuple[List[float], List[str], str]:
     return values, chapter_ids, story_id
 
 def run_one(json_path: str,
-            mode="k", k=1, pen=10.0, min_size=1,
-            out_dir="out") -> str:
+            mode="k", k=1, pen=1, min_size=1,
+            out_dir="out_twist") -> str:
     values, chapter_ids, story_id = load_values_from_json(json_path)
     os.makedirs(out_dir, exist_ok=True)
     fig_path = os.path.join(out_dir, f"{story_id}_twist.png")
@@ -204,7 +204,7 @@ def run_folder(folder: str,
 
 if __name__ == "__main__":
     # 跑單一檔
-    # run_one("mem0_temp0.4/404a-1.json", mode="k", k=1, min_size=1)
+    # run_one("data/mem0_101a/101a-1.json", mode="k", k=1, min_size=1)
 
     # 整個資料夾
-    run_folder("mem0_temp0.4", pattern="*.json", mode="k", k=1, min_size=1)
+    run_folder("data/none_101a", pattern="*.json", mode="k", k=1, min_size=1)

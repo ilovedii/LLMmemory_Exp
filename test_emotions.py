@@ -82,7 +82,7 @@ def process_json(json_path, out_dir, pen=12.0, model="rbf", min_size=2):
     plt.close(fig)
     print(f"[ok] -> {out_png}")
 
-def process_dir(in_dir, out_root="out_mem0_temp0.4", pen=12.0, model="rbf", min_size=2, pattern="*.json"):
+def process_dir(in_dir, out_root="out_emo", pen=12.0, model="rbf", min_size=2, pattern="*.json"):
     from pathlib import Path
     in_dir = Path(in_dir)
     out_dir = Path(out_root)            
@@ -92,7 +92,7 @@ def process_dir(in_dir, out_root="out_mem0_temp0.4", pen=12.0, model="rbf", min_
 
 if __name__ == "__main__":
     import sys
-    in_dir  = sys.argv[1] if len(sys.argv) > 1 else "mem0_temp0.4"
-    pen     = float(sys.argv[2]) if len(sys.argv) > 2 else 12.0
-    out_dir = "out_mem0_temp0.4"         
+    in_dir  = sys.argv[1] if len(sys.argv) > 1 else "data/none_101a"
+    pen     = float(sys.argv[2]) if len(sys.argv) > 2 else 0.2
+    out_dir = "out_emo/none_101a"         
     process_dir(in_dir, out_root=out_dir, pen=pen, model="rbf", min_size=2)

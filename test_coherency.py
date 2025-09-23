@@ -163,42 +163,87 @@ def main_person(doc):
     from collections import Counter
     return Counter(persons).most_common(1)[0][0]
 
+# def continuity_metrics(docs):
+#     ents = [chapter_entities(d) for d in docs]
+#     jac = [jaccard(ents[i], ents[i+1]) for i in range(len(ents)-1)]
+#     leaders = [main_person(d) for d in docs]
+#     persist = sum(1 for i in range(len(leaders)-1)
+#                   if leaders[i] and leaders[i]==leaders[i+1]) / max(1, len(leaders)-1)
+
+#     try:
+#         import numpy as np
+#         from sklearn.metrics.pairwise import cosine_similarity
+
+#         if not docs:
+#             adj_mean = nonadj_mean = global_coherence = local_coherence = 0.0
+#         else:
+#             vecs = np.vstack([d.vector for d in docs])
+#             S = cosine_similarity(vecs)  
+#             n = len(vecs)
+
+#             adj_sims = [S[i, i+1] for i in range(n-1)]
+#             # adj_mean = (sum(adj_sims)/len(adj_sims)) if adj_sims else 0.0
+
+#             # 不相鄰 
+#             nonadj_sims = [S[i, j] for i in range(n) for j in range(i+2, n)]
+#             # nonadj_mean = (sum(nonadj_sims)/len(nonadj_sims)) if nonadj_sims else 0.0
+
+#             # 全域 
+#             all_pairs = [S[i, j] for i in range(n) for j in range(i+1, n)]
+#             global_coherence = (sum(all_pairs)/len(all_pairs)) if all_pairs else 0.0
+
+#             # 相鄰章和非相鄰章的相似度差異
+#             local_coherence = sum(adj_sims) / sum(nonadj_sims) if nonadj_sims else 0.0
+
+#     except Exception:
+#         adj_mean = nonadj_mean = global_coherence = local_coherence = 0.0
+
+#     return {
+#         "jac_median": (sorted(jac)[len(jac)//2] if jac else 0.0),
+#         "jac_low_ratio": (sum(1 for x in jac if x < 0.10) / max(1, len(jac))),
+#         "main_persist": persist,
+#         "global_coherence": float(global_coherence),
+#         "local_coherence": float(local_coherence),
+#     }
+
 def continuity_metrics(docs):
     ents = [chapter_entities(d) for d in docs]
     jac = [jaccard(ents[i], ents[i+1]) for i in range(len(ents)-1)]
     leaders = [main_person(d) for d in docs]
     persist = sum(1 for i in range(len(leaders)-1)
-                  if leaders[i] and leaders[i]==leaders[i+1]) / max(1, len(leaders)-1)
+                  if leaders[i] and leaders[i] == leaders[i+1]) / max(1, len(leaders)-1)
 
     try:
         import numpy as np
-        from sklearn.metrics.pairwise import cosine_similarity
-        from sklearn.metrics import roc_auc_score
 
-        vecs = np.vstack([d.vector for d in docs])
-        adj = [cosine_similarity(vecs[i:i+1], vecs[i+1:i+2])[0,0]
-               for i in range(len(vecs)-1)]
-        mean_adj = float(np.mean(adj)) if adj else 0.0
-
-        pairs = [(i, j) for i in range(len(vecs)) for j in range(i+2, len(vecs))]
-        if pairs:
-            nonadj = [cosine_similarity(vecs[i:i+1], vecs[j:j+1])[0,0] for (i,j) in pairs]
-            mean_nonadj = float(np.mean(nonadj))
+        if not docs:
+            global_coherence = local_coherence = 0.0
         else:
-            nonadj = []
-            mean_nonadj = 0.0
+            vecs = np.vstack([d.vector for d in docs])
+            S = vecs @ vecs.T   # 內積矩陣
+            n = vecs.shape[0]
 
-        threadness_raw = mean_adj - mean_nonadj
+            adj_sims = [S[i, i+1] for i in range(n-1)]
+            nonadj_sims = [S[i, j] for i in range(n) for j in range(i+2, n)]
+            
+            all_pairs = [S[i, j] for i in range(n) for j in range(i+1, n)]
+            global_coherence = (sum(all_pairs) / len(all_pairs)) if all_pairs else 0.0
+
+            # 比值版 local（你現在的定義）
+            EPS = 1e-12
+            local_coherence = (sum(adj_sims) / (sum(nonadj_sims) + EPS)) if nonadj_sims else 0.0
 
     except Exception:
-        threadness_raw = 0.0
+        global_coherence = local_coherence = 0.0
 
     return {
         "jac_median": (sorted(jac)[len(jac)//2] if jac else 0.0),
         "jac_low_ratio": (sum(1 for x in jac if x < 0.10) / max(1, len(jac))),
         "main_persist": persist,
-        "threadness": threadness_raw,  
+        "global_coherence": float(global_coherence),
+        "local_coherence": float(local_coherence),
     }
+
 
 # ---------------- Consistency (NLI) helpers ----------------
 def _majority_protagonist(docs):
@@ -408,7 +453,8 @@ def evaluate_file(path: str) -> Dict:
         "jac_median": 0.0,
         "jac_low_ratio": 0.0,
         "main_persist": 0.0,
-        "threadness": 0.0,
+        "local_coherence": 0.0,
+        "global_coherence": 0.0,
     }
 
     res = {
@@ -421,6 +467,7 @@ def evaluate_file(path: str) -> Dict:
         "protagonist_guess": prot_guess,
     }
     res.update(cont) 
+    
     try:
         nli_stats = nli_contradiction_metrics(chap_texts, docs) if docs else {}
         res.update(nli_stats or {})
@@ -438,7 +485,9 @@ def print_report(res: Dict, simple: bool = False):
     print("Perplexity:", f"{res['ppl3_add1']:.2f}")
     print(f"Entity-overlap Jaccard (median) : {res.get('jac_median',0.0):.3f}  | low<0.10 ratio: {res.get('jac_low_ratio',0.0):.2f}")
     print(f"Main-character persistence      : {res.get('main_persist',0.0):.2f}")
-    print(f"Threadness (adj - nonadj sim)   : {res.get('threadness',0.0):.3f}")
+
+    print(f"Global coherence                     : {res.get('global_coherence',0.0):.3f}")
+    print(f"Local coherence                      : {res.get('local_coherence',0.0):.3f}")
 
     coh = res.get("coherence") or {}
     if coh:
@@ -454,19 +503,6 @@ def print_report(res: Dict, simple: bool = False):
         print(f"Contradictions                  : {res.get('nli_contradictions', 0)}")
         print(f"Contradiction rate              : {res.get('nli_contradiction_rate', 0.0):.3f}")
 
-        # tops = (res.get('nli_top_contradictions') or [])[:5]
-        # if tops:
-        #     print("Top contradictions (score  ch_i→ch_j  premise || hypothesis)")
-        #     for t in tops:
-        #         if isinstance(t, dict):
-        #             score = t.get('score', 0.0)
-        #             i = t.get('i'); j = t.get('j')
-        #             prem = t.get('premise',''); hyp = t.get('hypothesis','')
-        #         else:
-        #             score, i, j, prem, hyp = (t + (None,))[:5]  # 防禦性解包
-        #         sp = (prem[:80] + '…') if len(prem) > 80 else prem
-        #         sh = (hyp[:80] + '…') if len(hyp) > 80 else hyp
-        #         print(f"  {score:.3f}   ch_{i}→ch_{j}   {sp} || {sh}")
 
 def write_csv(rows: List[Dict], out_path: str):
     fieldnames = ["file", "tokens", "rep6", "rep10", "ppl3_add1"]

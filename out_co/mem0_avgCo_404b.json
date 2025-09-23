@@ -1,53 +1,53 @@
 {
   "length": {
     "tokens": {
-      "value": 1032.3
+      "value": 1017.8
     }
   },
   "n_gram": {
     "rep6": {
-      "value": 0.0174
+      "value": 0.0082
     },
     "rep10": {
-      "value": 0.0027
+      "value": 0.0008
     }
   },
   "Perplexity": {
     "ppl3_add1": {
-      "value": 320.5968,
+      "value": 323.5253,
       "explain": "困惑度(越低越好讀)",
       "range": "0~inf"
     }
   },
   "consistency(TRUNAJOD)": {
     "PU": {
-      "value": 12.0146,
+      "value": 12.6171,
       "explain": "主語連貫性"
     },
     "PW": {
-      "value": 15.0251,
+      "value": 16.0004,
       "explain": "賓語連貫性"
     },
     "PACC": {
-      "value": 77.6907,
+      "value": 84.0323,
       "explain": "整體連貫性"
     },
     "PU_dist": {
-      "value": 1.0538,
+      "value": 1.1522,
       "explain": "PU 距離量度"
     },
     "PW_dist": {
-      "value": 1.3143,
+      "value": 1.494,
       "explain": "PW 距離量度"
     },
     "PACC_dist": {
-      "value": 6.6983,
+      "value": 7.7391,
       "explain": "PACC 距離量度"
     }
   },
   "NER(Jaccard)": {
     "jac_median": {
-      "value": 0.665,
+      "value": 0.6805,
       "explain": "相鄰章實體重疊中位數",
       "range": "0~1"
     },
@@ -57,30 +57,35 @@
       "range": "0~1"
     },
     "main_persist": {
-      "value": 0.85,
+      "value": 0.5833,
       "explain": "主角持續度",
       "range": "0~1"
     }
   },
-  "Threadness": {
-    "threadness": {
-      "value": 0.0023,
+  "Thematic coherence": {
+    "global_coherence": {
+      "value": 0.9861,
+      "explain": "全域相似度",
+      "range": "-1~1"
+    },
+    "local_coherence": {
+      "value": 0.4003,
       "explain": "相鄰章和非相鄰章的相似度",
       "range": "-1~1"
     }
   },
   "NLI": {
     "nli_pairs": {
-      "value": 31.3,
+      "value": 40.2,
       "explain": "跨章比對的句子對數量"
     },
     "nli_contradictions": {
-      "value": 4.3,
+      "value": 4.9,
       "explain": "矛盾的對數",
       "range": "0~nli_pairs"
     },
     "nli_contradiction_rate": {
-      "value": 0.1723,
+      "value": 0.1269,
       "explain": "矛盾比",
       "range": "0~1"
     }

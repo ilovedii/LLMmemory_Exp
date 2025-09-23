@@ -102,7 +102,6 @@ def load_stories_from_jsons(folder: str, pattern="*.json", recursive: bool=False
         ids.append(story_id)
     return stories, ids
 
-
 def _tokenize_words(text: str) -> List[str]:
     return [t for t in text.split() if t]
 
@@ -133,7 +132,6 @@ def self_bleu(texts: List[str]) -> float:
     return float(np.mean(scores)) if scores else 0.0
 
 # ------------------ arc features ------------------
-
 def zscore(M: np.ndarray, axis=0) -> np.ndarray:
     mu = M.mean(axis=axis, keepdims=True)
     sd = M.std(axis=axis, keepdims=True)
@@ -193,7 +191,6 @@ def compute_emotion_arc_for_texts(texts: List[str], model_name="j-hartmann/emoti
     return zscore(E, axis=0)
 
 # ------------------ pairwise / dispersion ------------------
-
 def mean_pairwise_distance(distance_matrix: np.ndarray) -> float:
     n = distance_matrix.shape[0]
     if n < 2:
@@ -212,7 +209,6 @@ def pairwise_dtw(seqs: List[List[float]]) -> np.ndarray:
     return D
 
 # ------------------ SBERT dispersion (optional) ------------------
-
 def sbert_dispersion(texts: List[str], model_name="all-MiniLM-L6-v2") -> float:
     try:
         SentenceTransformer = _lazy_import_sbert()
@@ -234,7 +230,6 @@ def sbert_dispersion(texts: List[str], model_name="all-MiniLM-L6-v2") -> float:
         return None
 
 # ------------------ SDI ------------------
-
 def normalize(x, lo, hi):
     if x is None: return None
     if hi <= lo + 1e-8: return 0.5
@@ -271,7 +266,6 @@ def compute_sdi(metrics: Dict[str, float]) -> float:
     return s / (w + 1e-8)
 
 # ------------------ bootstrap CI ------------------
-
 def bootstrap_mean(vals: List[float], B=1000, alpha=0.05, seed=0) -> Tuple[float, float, float]:
     rng = np.random.default_rng(seed)
     vals = np.asarray(vals, dtype=float)
@@ -287,7 +281,6 @@ def bootstrap_mean(vals: List[float], B=1000, alpha=0.05, seed=0) -> Tuple[float
     return float(np.mean(vals)), float(lo), float(hi)
 
 # ------------------ visualization ------------------
-
 def plot_heatmap(D: np.ndarray, labels: List[str], title: str, out_path: str):
     fig, ax = plt.subplots(figsize=(6,5))
     im = ax.imshow(D, interpolation="nearest")
@@ -314,7 +307,6 @@ def plot_bar_with_ci(groups: List[str], means: List[float], los: List[float], hi
     plt.close(fig)
 
 # ------------------ main compute per group ------------------
-
 def compute_group_metrics(folder: str, args) -> Dict[str, Any]:
     # texts: use either aggregated story texts (join chapters) or .txt
     texts = []
@@ -396,7 +388,6 @@ def compute_group_metrics(folder: str, args) -> Dict[str, Any]:
     }
 
 # ------------------ CLI ------------------
-
 def main():
     parser = argparse.ArgumentParser(description="Compute cross-story diversity for one or more folders (groups).")
     parser.add_argument("folders", nargs="+", help="One or more folders *or files*; each is a group (e.g., mem0_temp0.4 mem0_temp0.8)")

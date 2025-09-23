@@ -1,86 +1,91 @@
 {
   "length": {
     "tokens": {
-      "value": 1047.4
+      "value": 994.0
     }
   },
   "n_gram": {
     "rep6": {
-      "value": 0.0076
+      "value": 0.0295
     },
     "rep10": {
-      "value": 0.0015
+      "value": 0.0204
     }
   },
   "Perplexity": {
     "ppl3_add1": {
-      "value": 324.4153,
+      "value": 325.5889,
       "explain": "困惑度(越低越好讀)",
       "range": "0~inf"
     }
   },
   "consistency(TRUNAJOD)": {
     "PU": {
-      "value": 12.4985,
+      "value": 12.0991,
       "explain": "主語連貫性"
     },
     "PW": {
-      "value": 16.6629,
+      "value": 16.4411,
       "explain": "賓語連貫性"
     },
     "PACC": {
-      "value": 84.1624,
+      "value": 77.2264,
       "explain": "整體連貫性"
     },
     "PU_dist": {
-      "value": 1.3535,
+      "value": 1.6735,
       "explain": "PU 距離量度"
     },
     "PW_dist": {
-      "value": 1.8097,
+      "value": 2.4475,
       "explain": "PW 距離量度"
     },
     "PACC_dist": {
-      "value": 8.9949,
+      "value": 11.7335,
       "explain": "PACC 距離量度"
     }
   },
   "NER(Jaccard)": {
     "jac_median": {
-      "value": 0.6583,
+      "value": 0.425,
       "explain": "相鄰章實體重疊中位數",
       "range": "0~1"
     },
     "jac_low_ratio": {
-      "value": 0.0,
+      "value": 0.2167,
       "explain": "相鄰章幾乎不重疊的比例(越低越好)",
       "range": "0~1"
     },
     "main_persist": {
-      "value": 0.9167,
+      "value": 0.4833,
       "explain": "主角持續度",
       "range": "0~1"
     }
   },
-  "Threadness": {
-    "threadness": {
-      "value": 0.0029,
+  "Thematic coherence": {
+    "global_coherence": {
+      "value": 0.9784,
+      "explain": "全域相似度",
+      "range": "-1~1"
+    },
+    "local_coherence": {
+      "value": 0.4024,
       "explain": "相鄰章和非相鄰章的相似度",
       "range": "-1~1"
     }
   },
   "NLI": {
     "nli_pairs": {
-      "value": 23.8,
+      "value": 81.5,
       "explain": "跨章比對的句子對數量"
     },
     "nli_contradictions": {
-      "value": 3.8,
+      "value": 14.7,
       "explain": "矛盾的對數",
       "range": "0~nli_pairs"
     },
     "nli_contradiction_rate": {
-      "value": 0.1443,
+      "value": 0.2074,
       "explain": "矛盾比",
       "range": "0~1"
     }
