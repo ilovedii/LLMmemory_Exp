@@ -44,64 +44,64 @@ for group in group_names:
     if f:
         with open(f, 'r') as fp:
             data = json.load(fp)
-            # nli_without.append(data['NLI']['nli_contradiction_rate']['value'])
+            nli_without.append(data['NLI']['nli_contradiction_rate']['value'])
             
-            # perplexity_without.append(data['Perplexity']['ppl3_add1']['value'])
+            perplexity_without.append(data['Perplexity']['ppl3_add1']['value'])
 
             jac_median_without.append(data['NER(Jaccard)']['jac_median']['value'])
             main_persist_without.append(data['NER(Jaccard)']['main_persist']['value'])
             jac_low_ratio_without.append(data['NER(Jaccard)']['jac_low_ratio']['value'])
 
-            # coherence_without.append(data['Thematic coherence']['global_coherence']['value'])
+            coherence_without.append(data['Thematic coherence']['global_coherence']['value'])
     else:
-        # nli_without.append(np.nan)
+        nli_without.append(np.nan)
 
-        # perplexity_without.append(np.nan)
+        perplexity_without.append(np.nan)
 
         jac_median_without.append(np.nan)
         main_persist_without.append(np.nan)
         jac_low_ratio_without.append(np.nan)
 
-        # coherence_without.append(np.nan)
+        coherence_without.append(np.nan)
 
     f = groups[group].get('with')
     if f:
         with open(f, 'r') as fp:
             data = json.load(fp)
-            # nli_with.append(data['NLI']['nli_contradiction_rate']['value'])
+            nli_with.append(data['NLI']['nli_contradiction_rate']['value'])
 
-            # perplexity_with.append(data['Perplexity']['ppl3_add1']['value'])
+            perplexity_with.append(data['Perplexity']['ppl3_add1']['value'])
 
             jac_median_with.append(data['NER(Jaccard)']['jac_median']['value'])
             main_persist_with.append(data['NER(Jaccard)']['main_persist']['value'])
             jac_low_ratio_with.append(data['NER(Jaccard)']['jac_low_ratio']['value'])
 
-            # coherence_with.append(data['Thematic coherence']['global_coherence']['value'])
+            coherence_with.append(data['Thematic coherence']['global_coherence']['value'])
     else:
-        # nli_with.append(np.nan)
+        nli_with.append(np.nan)
 
-        # perplexity_with.append(np.nan)
+        perplexity_with.append(np.nan)
 
         jac_median_with.append(np.nan)
         main_persist_with.append(np.nan)
         jac_low_ratio_with.append(np.nan)
 
-        # coherence_with.append(np.nan)
+        coherence_with.append(np.nan)
 
 x = np.arange(len(group_names))
-bar_width = 0.08
+bar_width = 0.25
 
 plt.figure(figsize=(12, 6))
-# plt.bar(x - (bar_width/2+ 0.05), nli_without, bar_width, label='without mem0', color='#6aaac4')
-# plt.bar(x + (bar_width/2+ 0.05), nli_with, bar_width, label='with mem0', color='#87ceeb', hatch='///', edgecolor='white')
+plt.bar(x - (bar_width/2+ 0.05), nli_without, bar_width, label='without mem0', color='#6aaac4')
+plt.bar(x + (bar_width/2+ 0.05), nli_with, bar_width, label='with mem0', color='#87ceeb', hatch='///', edgecolor='white')
 
-offsets = np.linspace(-bar_width*4, bar_width*4, 6)
-plt.bar(x + offsets[0], jac_median_without, bar_width, label='jac_median (without mem0)', color='#6aaac4')
-plt.bar(x + offsets[1], jac_median_with, bar_width, label='jac_median (with mem0)', color='#87ceeb', hatch='////', edgecolor='white')
-plt.bar(x + offsets[4], main_persist_without, bar_width, label='main_persist (without mem0)', color="#FF8952")
-plt.bar(x + offsets[5], main_persist_with, bar_width, label='main_persist (with mem0)', color="#F58D5C", hatch='////', edgecolor='white')
-plt.bar(x + offsets[2], jac_low_ratio_without, bar_width, label='jac_low_ratio (without mem0)', color="#919090")
-plt.bar(x + offsets[3], jac_low_ratio_with, bar_width, label='jac_low_ratio (with mem0)', color="#C2C2C2", hatch='////', edgecolor='white')
+# offsets = np.linspace(-bar_width*4, bar_width*4, 6)
+# plt.bar(x + offsets[0], jac_median_without, bar_width, label='jac_median (without mem0)', color='#6aaac4')
+# plt.bar(x + offsets[1], jac_median_with, bar_width, label='jac_median (with mem0)', color='#87ceeb', hatch='////', edgecolor='white')
+# plt.bar(x + offsets[4], main_persist_without, bar_width, label='main_persist (without mem0)', color="#FF8952")
+# plt.bar(x + offsets[5], main_persist_with, bar_width, label='main_persist (with mem0)', color="#F58D5C", hatch='////', edgecolor='white')
+# plt.bar(x + offsets[2], jac_low_ratio_without, bar_width, label='jac_low_ratio (without mem0)', color="#919090")
+# plt.bar(x + offsets[3], jac_low_ratio_with, bar_width, label='jac_low_ratio (with mem0)', color="#C2C2C2", hatch='////', edgecolor='white')
 
 
 
@@ -118,10 +118,10 @@ plt.bar(x + offsets[3], jac_low_ratio_with, bar_width, label='jac_low_ratio (wit
 
 plt.xticks(x, group_names, rotation=45, ha='right')
 plt.ylabel('Value')
-# plt.title('NLI Contradiction Rate (↓ is better)')
-plt.title('NER Jaccard Comparison')
-# plt.title('Perplexity Comparison (↓ is better)')
-# plt.title('Thematic Coherence Comparison (↑ is better)')
+plt.title('NLI Contradiction Rate (↓) Average')
+# plt.title('NER Jaccard Comparison')
+# plt.title('Perplexity Comparison (↓) Average')
+# plt.title('Thematic Coherence Comparison (↑) Average')
 plt.legend()
 plt.tight_layout()
-plt.savefig('out_pic/ner.png')
+plt.savefig('out_pic/nli.png')
