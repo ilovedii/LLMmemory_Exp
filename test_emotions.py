@@ -73,11 +73,11 @@ def process_json(json_path, out_dir, pen=12.0, model="rbf", min_size=2):
         ax.grid(True, alpha=0.3)
     axes[-1].set_xticks(x)
     axes[-1].set_xticklabels(chapter_ids)
-    fig.suptitle(f"{Path(json_path).stem} – PELT pen={pen} (segments={len(bkps)})", y=0.98)
+    fig.suptitle(f"Without mem0 Emotion analyze", y=0.94, fontsize=20)
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
-    out_png = out_dir / f"{Path(json_path).stem}_emo_pen{int(pen)}.png"
+    out_png = out_dir / f"{Path(json_path).stem}_emo.png"
     plt.savefig(out_png, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"[ok] -> {out_png}")
@@ -94,5 +94,5 @@ if __name__ == "__main__":
     import sys
     in_dir  = sys.argv[1] if len(sys.argv) > 1 else "data/none_101a"
     pen     = float(sys.argv[2]) if len(sys.argv) > 2 else 0.2
-    out_dir = "out_emo/none_101a"         
+    out_dir = "out_emo/none_101a"
     process_dir(in_dir, out_root=out_dir, pen=pen, model="rbf", min_size=2)

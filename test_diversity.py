@@ -163,7 +163,7 @@ def dtw_distance(a: List[float], b: List[float]) -> float:
     if not _HAS_FDTW:
         # fallback: euclidean between resampled vectors
         return float(np.linalg.norm(resample_1d(a, 100) - resample_1d(b, 100)))
-    dist, _ = fastdtw(a, b, dist=euclidean)
+    dist, _ = fastdtw(a, b, dist=lambda x, y: abs(float(x) - float(y)))
     return float(dist)
 
 # emotion arc via HF pipeline (optional)
@@ -429,22 +429,13 @@ def main():
         means = [r["SDI"] for r in rows]
         los   = means[:]  # no bootstrap per-group by default (we have only one SDI per group)
         his   = means[:]
-        plot_bar_with_ci(groups, means, los, his, "Story Diversity Index (SDI)", "SDI (0~1)", str(Path(args.out_dir) / "SDI_by_group.png"))
-
-        # Self-BLEU (lower better) & Distinct-2 (higher better)
-        plot_bar_with_ci(groups, [r["selfbleu"] for r in rows], [r["selfbleu"] for r in rows], [r["selfbleu"] for r in rows],
-                         "Self-BLEU (lower=more diverse)", "Self-BLEU", str(Path(args.out_dir) / "SelfBLEU_by_group.png"))
-        plot_bar_with_ci(groups, [r["distinct2"] for r in rows], [r["distinct2"] for r in rows], [r["distinct2"] for r in rows],
-                         "Distinct-2 (higher=more diverse)", "Distinct-2", str(Path(args.out_dir) / "Distinct2_by_group.png"))
 
         # Emotion / Plot MPD (may be None)
         if any(r["emo_mpd"] is not None for r in rows):
             vals = [ (r["emo_mpd"] if r["emo_mpd"] is not None else 0.0) for r in rows ]
-            plot_bar_with_ci(groups, vals, vals, vals, "Emotion-arc MPD (higher=more diverse)", "DTW distance", str(Path(args.out_dir) / "EmoMPD_by_group.png"))
         if any(r["plot_mpd"] is not None for r in rows):
             vals = [ (r["plot_mpd"] if r["plot_mpd"] is not None else 0.0) for r in rows ]
-            plot_bar_with_ci(groups, vals, vals, vals, "Plot-arc MPD (higher=more diverse)", "DTW distance", str(Path(args.out_dir) / "PlotMPD_by_group.png"))
-
+            
     print("[done]")
 
 if __name__ == "__main__":

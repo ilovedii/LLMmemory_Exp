@@ -1,210 +1,166 @@
+import os, json, glob, argparse, sys
+from typing import List, Tuple, Optional
+
 import numpy as np
-import os
-import matplotlib.pyplot as plt
 import ruptures as rpt
+import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
-def _cap_params(n, k, min_size, model="rbf"):
-    m = max(1, int(min_size))
-    if model == "rbf" and m < 2:
-        m = 2
-    k_max = max(0, n // m - 1)   
-    if k > k_max:
-        print(f"[warn] k={k} > k_max={k_max} (n={n}, min_size={m})，自動下修為 {k_max}")
-        k = k_max
-    return k, m
+# --- Embeddings ---
+def _lazy_import_st():
+    try:
+        from sentence_transformers import SentenceTransformer
+        return SentenceTransformer
+    except Exception as e:
+        print("[error] sentence-transformers not installed. Please run:", file=sys.stderr)
+        print("   pip install sentence-transformers", file=sys.stderr)
+        raise
 
+def embed_texts(texts: List[str], model_name: str = "all-MiniLM-L6-v2", device: Optional[str] = None) -> np.ndarray:
+    SentenceTransformer = _lazy_import_st()
+    model = SentenceTransformer(model_name, device=device)
+    clean = [(t or "").strip() for t in texts]
+    embs = model.encode(clean, convert_to_numpy=True, normalize_embeddings=True, show_progress_bar=False)
+    return embs.astype(np.float32)
+
+def novelty_from_embeddings(embs: np.ndarray) -> np.ndarray:
+    """
+    v_t = 1 - cos(e_t, e_{t-1}),  v_1 = 0
+    """
+    n = embs.shape[0]
+    v = np.zeros(n, dtype=np.float32)
+    if n <= 1:
+        return v
+    dots = np.sum(embs[1:] * embs[:-1], axis=1)
+    v[1:] = 1.0 - np.clip(dots, -1.0, 1.0)
+    return v
+
+def load_chapters(json_path: str) -> Tuple[List[str], List[str], str]:
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    story_id = str(data.get("story_id") or os.path.splitext(os.path.basename(json_path))[0])
+    chs = data.get("chapters") or []
+    if not isinstance(chs, list) or len(chs) == 0:
+        raise ValueError(f"{json_path} has no 'chapters' array.")
+    texts, ids = [], []
+    for i, ch in enumerate(chs, start=1):
+        txt = (ch.get("text") or "").strip()
+        if not txt:
+            raise ValueError(f"{json_path} chapter {i} has empty 'text'; cannot compute embeddings without text.")
+        texts.append(txt)
+        ids.append(str(ch.get("id") or i))
+    return texts, ids, story_id
+
+# --- Segmentation + plotting ---
 def _ensure_last_n(bkps, n):
     if not bkps or bkps[-1] != n:
         bkps = [b for b in bkps if 0 < b < n] + [n]
     return bkps
 
-def segment_plot_1d(values, chapter_ids=None, *, 
-                    mode="k", k=1, pen=1, cuts=None,
-                    min_size=2, model="rbf",
-                    fig_path="seg1d.png", title=None):
+def segment_and_plot(values: np.ndarray,
+                     chapter_ids: List[str],
+                     *, mode: str = "pen", pen: float = 0.2,
+                     min_size: int = 2, model: str = "rbf",
+                     fig_path: str = "seg1d.png", title: Optional[str] = None) -> List[int]:
 
     v = np.asarray(values).reshape(-1, 1)
     n = v.shape[0]
-    if chapter_ids is None:
-        chapter_ids = [str(i+1) for i in range(n)]
     if n == 0:
-        raise ValueError("空資料")
-    if n == 1:
-        bkps = [1]
-        seg_bounds = [(0, 1)]
-        _plot_1d(v, bkps, chapter_ids, title or "Fixed k=0 (segments=1)", fig_path)
-        print(f"[info] change-points: []  (segments=1)")
-        return bkps
+        raise ValueError("empty series")
 
-    if mode == "cuts":
-        bkps = _ensure_last_n(sorted(cuts or []), n)
-        used_k, used_min = len(bkps)-1, min_size
-    elif mode == "pen":
-        # PELT 
+    if mode == "pen":
         bkps = rpt.Pelt(model=model, min_size=max(1, min_size)).fit(v).predict(pen=pen)
-        bkps = _ensure_last_n(bkps, n)
-        used_k, used_min = len(bkps)-1, min_size
-    elif mode == "k":
-        # 固定刀數
-        k, m = _cap_params(n, int(k), min_size, model=model)
-        if k == 0:
-            bkps = [n]
-        else:
-            try:
-                bkps = rpt.Binseg(model=model, min_size=m).fit(v).predict(n_bkps=k)
-            except Exception:
-                bkps = rpt.Dynp(model=model, min_size=m).fit(v).predict(n_bkps=k)
-        bkps = _ensure_last_n(bkps, n)
-        used_k, used_min = k, m
     else:
-        raise ValueError("mode 必須是 'k'、'pen' 或 'cuts'")
+        raise ValueError("Only 'pen' mode is supported in this script.")
+    bkps = _ensure_last_n(bkps, n)
 
-    #  繪圖 
     if title is None:
-        if mode == "k":
-            title = f"Fixed k={used_k} (segments={used_k+1}), min_size={used_min}"
-        elif mode == "pen":
-            title = f"PELT pen={pen} (segments={len(bkps)})"
-        else:
-            title = f"Manual cuts {bkps[:-1]} (segments={len(bkps)})"
-
-    _plot_1d(v, bkps, chapter_ids, title, fig_path)
-
-    cps = bkps[:-1]
-    print(f"[info] change-points: {cps}  (segments={len(bkps)})")
-    for j, cp in enumerate(cps, 1):
-        li, ri = cp-1, cp
-        print(f"  cp{j} = {cp}  between chapter_ids[{li}]={chapter_ids[li]} and chapter_ids[{ri}]={chapter_ids[ri]}")
-    print(f"saved figure -> {fig_path}")
-    return bkps
-
-def _plot_1d(v, bkps, chapter_ids, title, fig_path):
-    n = v.shape[0]
-    ends = bkps                      # e.g. [cp1, cp2, n]
-    seg_bounds = list(zip([0] + ends[:-1], ends))
-    cmap = plt.get_cmap("tab20")
-    seg_colors = [cmap(i % cmap.N) for i in range(len(seg_bounds))]
+        title = f"PELT pen={pen} (segments={len(bkps)}) – signal=embed_novelty"
 
     x = np.arange(n)
-    fig, ax = plt.subplots(1, 1, figsize=(12, 4), sharex=True)
+    fig, ax = plt.subplots(1, 1, figsize=(12, 4))
     ax.plot(x, v[:, 0], marker='o', linewidth=1.6)
 
-    # 每段不同底色 
-    for (s, e), color in zip(seg_bounds, seg_colors):
-        ax.axvspan(s - 0.5, e - 0.5, alpha=0.25, facecolor=color, linewidth=0)
+    ends = bkps
+    seg_bounds = list(zip([0] + ends[:-1], ends))
+    colors = ["#DDEEFF", "#FFEDD5", "#E6FFE6", "#FFF0F6", "#FFF9DD", "#E0E0FF", "#FFDDEE"]
+    for i, (s, e) in enumerate(seg_bounds):
+        ax.axvspan(s - 0.5, e - 0.5, alpha=0.25, facecolor=colors[i % len(colors)], linewidth=0)
     for b in ends[:-1]:
         ax.axvline(b - 0.5, linestyle='--', linewidth=1.2)
 
-    ax.set_ylabel("Value", rotation=0, ha="right", va="center")
-    ax.grid(True, linewidth=0.5, alpha=0.4)
+    ax.set_ylabel("Novelty", rotation=0, ha="right", va="center")
     ax.set_xticks(x)
-    ax.set_xticklabels(chapter_ids, rotation=0)
+    ax.set_xticklabels(chapter_ids)
+    ax.grid(True, linewidth=0.5, alpha=0.4)
 
-    patches = [Patch(facecolor=seg_colors[i], edgecolor='none',
-                     label=f"Seg {i+1}: {chapter_ids[s]}-{chapter_ids[e-1]}")
-               for i, (s, e) in enumerate(seg_bounds)]
-    fig.legend(handles=patches, loc='upper center',
-               ncol=min(6, len(patches)), frameon=False, bbox_to_anchor=(0.5, 1.05))
+    # import matplotlib.patches as mpatches
+    # patches = [mpatches.Patch(alpha=0.25, facecolor=colors[i % len(colors)],
+    #                           label=f"Seg {i+1}: {chapter_ids[s]}-{chapter_ids[e-1]}")
+    #            for i, (s, e) in enumerate(seg_bounds)]
+    # fig.legend(handles=patches, loc='upper center',
+    #            ncol=min(6, len(patches)), frameon=False, bbox_to_anchor=(0.5, 1.05))
 
-    plt.suptitle(title, y=0.98)
+    plt.suptitle(title, y=0.92, fontsize=20)
     plt.tight_layout(rect=[0, 0, 1, 0.92])
     plt.savefig(fig_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    
-import os, json, glob, math
-import numpy as np
-from typing import Tuple, List, Any
+    return bkps
 
-
-def _coerce_float(x: Any) -> float | None:
-    try:
-        if x is None: return None
-        v = float(x)
-        if math.isfinite(v):
-            return v
-    except Exception:
-        return None
-    return None
-
-def _extract_from_chapter(ch: dict) -> float | None:
-    for key in ("value", "pc1", "score"):
-        v = _coerce_float(ch.get(key))
-        if v is not None:
-            return v
-    # 退回：用字數作為一維值
-    txt = (ch.get("text") or "").strip()
-    if txt:
-        return float(len(txt.split()))
-    return None
-
-def load_values_from_json(json_path: str) -> Tuple[List[float], List[str], str]:
-  
-    with open(json_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    story_id = str(data.get("story_id") or os.path.splitext(os.path.basename(json_path))[0])
-
-    if "values" in data:
-        values = data["values"]
-        chapter_ids = data.get("chapter_ids") or [str(i + 1) for i in range(len(values))]
-        values = [float(x) for x in values]  # 轉 float
-        return values, chapter_ids, story_id
-
-    chs = data.get("chapters") or []
-    if not isinstance(chs, list) or len(chs) == 0:
-        raise ValueError(f"{json_path} 沒有 values，也沒有 chapters 可萃取")
-
-    values: List[float] = []
-    chapter_ids: List[str] = []
-    for i, ch in enumerate(chs, start=1):
-        v = _extract_from_chapter(ch)
-        if v is None:
-            v = 0.0
-        values.append(float(v))
-        chapter_ids.append(str(ch.get("id") or i))
-
-    return values, chapter_ids, story_id
-
-def run_one(json_path: str,
-            mode="k", k=1, pen=1, min_size=1,
-            out_dir="out_twist") -> str:
-    values, chapter_ids, story_id = load_values_from_json(json_path)
+def run_file(json_path: str,
+             pen: float = 0.2,
+             model_name: str = "all-MiniLM-L6-v2",
+             device: Optional[str] = None,
+             out_dir: str = "out_twist",
+             min_size: int = 2) -> str:
+    texts, chapter_ids, story_id = load_chapters(json_path)
     os.makedirs(out_dir, exist_ok=True)
     fig_path = os.path.join(out_dir, f"{story_id}_twist.png")
 
-    title = f"{story_id} – mode={mode}" + (f", k={k}" if mode=="k" else f", pen={pen}")
-    segment_plot_1d(
-        values,
-        chapter_ids,
-        mode=mode,
-        k=k,
-        pen=pen,
-        min_size=min_size,
-        fig_path=fig_path,
-        title=title
+    embs = embed_texts(texts, model_name=model_name, device=device)
+    novelty = novelty_from_embeddings(embs)
+
+    mu, sd = float(np.mean(novelty)), float(np.std(novelty))
+    novelty_z = (novelty - mu) / sd if sd > 0 else novelty
+
+    title = f"With mem0 Plot analyze"
+    segment_and_plot(
+        novelty_z, chapter_ids,
+        mode="pen", pen=pen, min_size=min_size, model="rbf",
+        fig_path=fig_path, title=title
     )
     print("saved figure ->", os.path.abspath(fig_path))
     return fig_path
 
-def run_folder(folder: str,
-               pattern: str = "*.json",
-               **kwargs) -> None:
+def run_folder(folder: str, pattern: str = "*.json", **kwargs) -> None:
+    import glob
     paths = sorted(glob.glob(os.path.join(folder, pattern)))
-    if not paths:
-        print(f"[warn] {folder} 下找不到 {pattern}")
-        return
-    print(f"[info] 批次處理 {len(paths)} 個 JSON")
+    print(f"[info] {folder} files: {len(paths)}")
     for p in paths:
         try:
-            print(f"\n=== {p} ===")
-            run_one(p, **kwargs)
+            print(f"=== {p} ===")
+            run_file(p, **kwargs)
         except Exception as e:
             print(f"[error] {p}: {e}")
 
-if __name__ == "__main__":
-    # 跑單一檔
-    # run_one("data/mem0_101a/101a-1.json", mode="k", k=1, min_size=1)
+def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    g = ap.add_mutually_exclusive_group(required=True)
+    g.add_argument("--file", type=str)
+    g.add_argument("--folder", type=str)
+    ap.add_argument("--pattern", type=str, default="*.json")
+    ap.add_argument("--pen", type=float, default=0.2)
+    ap.add_argument("--model", type=str, default="all-MiniLM-L6-v2")
+    ap.add_argument("--device", type=str, default=None)
+    ap.add_argument("--min_size", type=int, default=2)
+    ap.add_argument("--out_dir", type=str, default="out_twist")
+    args = ap.parse_args()
 
-    # 整個資料夾
-    run_folder("data/none_101a", pattern="*.json", mode="k", k=1, min_size=1)
+    if args.file:
+        run_file(args.file, pen=args.pen, model_name=args.model, device=args.device, out_dir=args.out_dir, min_size=args.min_size)
+    else:
+        run_folder(args.folder, pattern=args.pattern, pen=args.pen, model_name=args.model, device=args.device, out_dir=args.out_dir, min_size=args.min_size)
+
+if __name__ == "__main__":
+    main()
