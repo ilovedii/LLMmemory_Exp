@@ -38,8 +38,8 @@ def plot_comparison_from_csv(df, metric_column, title, ylabel, filename):
     plt.bar(x + (bar_width/2 + 0.05), values_with, bar_width, 
             label='with mem0', color='#87ceeb', hatch='///', edgecolor='white')
     
-    plt.ylim(0.7, 0.9)
-    plt.yticks(np.arange(0.7, 1, 0.05))
+    plt.ylim(0, 0.5)
+    plt.yticks(np.arange(0, 0.6, 0.1))
 
     plt.xticks(x, common_groups, rotation=45, ha='right')
     plt.ylabel(ylabel)
@@ -48,8 +48,8 @@ def plot_comparison_from_csv(df, metric_column, title, ylabel, filename):
     plt.tight_layout()
     plt.savefig(f'out_pic/{filename}')
 
-
-plot_comparison_from_csv(df, 'SDI', 'SDI Comparison', 'SDI Score', 'sdi_comparison.png')
+plot_comparison_from_csv(df,'lex_jsd','Lexical Diversity (↑)','Lexical Entropy','lex.png')
+# plot_comparison_from_csv(df, 'SDI', 'SDI Comparison', 'SDI Score', 'sdi_comparison.png')
 # plot_comparison_from_csv(df, 'distinct2', 'Distinct-2 Comparison', 'Distinct-2 Score', 'distinct2_comparison.png')
 # plot_comparison_from_csv(df, 'selfbleu', 'Self-BLEU Comparison', 'Self-BLEU Score', 'selfbleu_comparison.png')
 # plot_comparison_from_csv(df, 'plot_mpd', 'Plot MPD Comparison', 'Plot MPD Score', 'plot_mpd_comparison.png')
